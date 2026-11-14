@@ -188,3 +188,67 @@ def login_user(user: LoginRequest):
             status_code=500,
             detail="Something went wrong during login"
         )
+class StudentProfileRequest(BaseModel):
+    state: str
+    district: str
+    category: str
+    course: str
+    branch: str
+    current_year: str
+    previous_marks: float
+    annual_family_income: float
+
+
+@app.post("/student-profile/{user_id}")
+def save_student_profile(user_id: int, profile: StudentProfileRequest):
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor() as cursor:
+
+                cursor.execute(
+                    """
+                    INSERT INTO student_profiles (
+                        user_id,
+                        state,
+                        district,
+                        category,
+                        course,
+                        branch,
+                        current_year,
+                        previous_marks,
+                        annual_family_income
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (user_id)
+                    DO UPDATE SET
+                        state = EXCLUDED.state,
+                        district = EXCLUDED.district,
+                        category = EXCLUDED.category,
+                        course = EXCLUDED.course,
+                        branch = EXCLUDED.branch,
+                        current_year = EXCLUDED.current_year,
+                        previous_marks = EXCLUDED.previous_marks,
+                        annual_family_income = EXCLUDED.annual_family_income,
+                        updated_at = CURRENT_TIMESTAMP;
+                    """,
+                    (
+                        user_id,
+                        profile.state,
+                        profile.district,
+                        profile.category,
+                        profile.course,
+                        profile.branch,
+                        profile.current_year,
+                        profile.previous_marks,
+                        profile.annual_family_income
+                    )
+                )
+
+        return {"message": "Student profile saved successfully"}
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to save student profile"
+        )

@@ -1,7 +1,18 @@
 
-import React from "react";
+import StudentProfile from "./StudentProfile";
+import React, { useState } from "react";
+import "./Dashboard.css";
 
 function Dashboard({ user, onLogout }) {
+  const [showProfile, setShowProfile] = useState(false);
+  if (showProfile) {
+  return (
+    <StudentProfile
+      user={user}
+      onBack={() => setShowProfile(false)}
+    />
+  );
+}
   return (
     <div className="dashboard-container">
       <nav className="navbar">
@@ -34,7 +45,11 @@ function Dashboard({ user, onLogout }) {
             <p>Explore financial assistance programs.</p>
           </div>
 
-          <div className="dashboard-card">
+          <div
+            className="dashboard-card"
+            onClick={() => setShowProfile(true)}
+            style={{ cursor: "pointer" }}
+          >
             <h2>👤</h2>
             <h3>My Profile</h3>
             <p>Manage your student information.</p>
