@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Frontend
+node_modules/
+dist/
+
+# Database backups
+*.dump
+
+# System
+.DS_Store
