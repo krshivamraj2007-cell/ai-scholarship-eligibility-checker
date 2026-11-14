@@ -1,3 +1,4 @@
+from eligibility import check_basic_eligibility
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 
@@ -251,4 +252,160 @@ def save_student_profile(user_id: int, profile: StudentProfileRequest):
         raise HTTPException(
             status_code=500,
             detail="Unable to save student profile"
+        )
+
+# Get all active government schemes
+@app.get("/government-schemes")
+def get_government_schemes():
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor() as cursor:
+
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        scheme_name,
+                        government_level,
+                        state_ut,
+                        category,
+                        description,
+                        eligibility_criteria,
+                        benefits,
+                        required_documents,
+                        education_level,
+                        application_url,
+                        official_source_url,
+                        scheme_type,
+                        benefit_type,
+                        annual_income_limit,
+                        minimum_marks,
+                        scholarship_amount,
+                        maximum_loan_amount,
+                        interest_rate,
+                        interest_subvention_rate,
+                        repayment_period_years,
+                        moratorium_period,
+                        collateral_requirement,
+                        credit_guarantee_details,
+                        eligible_institutions,
+                        eligible_courses,
+                        renewal_conditions,
+                        application_start_date,
+                        application_deadline
+                    FROM government_schemes
+                    WHERE is_active = TRUE
+                    ORDER BY id;
+                    """
+                )
+
+                rows = cursor.fetchall()
+
+                columns = [column.name for column in cursor.description]
+
+                schemes = [
+                    dict(zip(columns, row))
+                    for row in rows
+                ]
+
+        return {
+            "total": len(schemes),
+            "schemes": schemes
+        }
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to fetch government schemes"
+        )
+
+@app.get("/eligible-schemes/{user_id}")
+def get_eligible_schemes(user_id: int):
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor() as cursor:
+
+                # 1. Fetch student profile
+                cursor.execute(
+                    """
+                    SELECT
+                        state,
+                        district,
+                        category,
+                        course,
+                        branch,
+                        current_year,
+                        previous_marks,
+                        annual_family_income
+                    FROM student_profiles
+                    WHERE user_id = %s;
+                    """,
+                    (user_id,)
+                )
+
+                profile_row = cursor.fetchone()
+
+                if profile_row is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Student profile not found"
+                    )
+
+                profile_columns = [
+                    column.name for column in cursor.description
+                ]
+
+                student = dict(zip(profile_columns, profile_row))
+
+                # 2. Fetch active schemes
+                cursor.execute(
+                    """
+                    SELECT *
+                    FROM government_schemes
+                    WHERE is_active = TRUE
+                    ORDER BY id;
+                    """
+                )
+
+                scheme_rows = cursor.fetchall()
+                scheme_columns = [
+                    column.name for column in cursor.description
+                ]
+
+                schemes = [
+                    dict(zip(scheme_columns, row))
+                    for row in scheme_rows
+                ]
+
+        # 3. Match student with schemes
+        matched_schemes = []
+
+        for scheme in schemes:
+
+            eligibility_result = check_basic_eligibility(student, scheme)
+
+            matched_schemes.append({
+                "scheme_id": scheme["id"],
+                "scheme_name": scheme["scheme_name"],
+                "status": eligibility_result["status"],
+                "checks": eligibility_result["checks"]
+            })
+
+        return {
+            "user_id": user_id,
+            "total_schemes": len(schemes),
+            "matched_schemes": matched_schemes
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        print("ELIGIBILITY MATCHING ERROR:", repr(error))
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to match government schemes"
         )

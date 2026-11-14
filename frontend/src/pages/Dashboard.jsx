@@ -1,15 +1,23 @@
-
+import GovernmentSchemes from "./GovernmentSchemes";
 import StudentProfile from "./StudentProfile";
 import React, { useState } from "react";
 import "./Dashboard.css";
 
 function Dashboard({ user, onLogout }) {
   const [showProfile, setShowProfile] = useState(false);
+  const [showSchemes, setShowSchemes] = useState(false);
   if (showProfile) {
   return (
     <StudentProfile
       user={user}
       onBack={() => setShowProfile(false)}
+    />
+  );
+}
+  if (showSchemes) {
+  return (
+    <GovernmentSchemes
+      onBack={() => setShowSchemes(false)}
     />
   );
 }
@@ -39,12 +47,15 @@ function Dashboard({ user, onLogout }) {
             <p>Discover scholarships matching your profile.</p>
           </div>
 
-          <div className="dashboard-card">
+          <div
+            className="dashboard-card"
+            onClick={() => setShowSchemes(true)}
+            style={{ cursor: "pointer" }}
+          >
             <h2>🏛️</h2>
             <h3>Government Schemes</h3>
             <p>Explore financial assistance programs.</p>
           </div>
-
           <div
             className="dashboard-card"
             onClick={() => setShowProfile(true)}
