@@ -103,11 +103,56 @@ def check_category_eligibility(student_category, scheme_category):
 
     return "not_eligible"
 
+# 4. Check education-level eligibility
+def check_education_level_eligibility(student_course, scheme_education_level):
+    """
+    Checks whether the student's course matches
+    the education level supported by the scheme.
+    """
 
+    if not student_course or not scheme_education_level:
+        return "unknown"
+
+    course = student_course.strip().lower()
+    scheme_level = scheme_education_level.strip().lower()
+
+    # Map student courses to education levels
+    course_mapping = {
+        "b.tech": "undergraduate",
+        "b.e.": "undergraduate",
+        "bachelor of technology": "undergraduate",
+        "bachelor of engineering": "undergraduate",
+        "bca": "undergraduate",
+        "b.sc": "undergraduate",
+        "b.com": "undergraduate",
+        "ba": "undergraduate",
+        "diploma": "diploma",
+        "m.tech": "postgraduate",
+        "m.e.": "postgraduate",
+        "mca": "postgraduate",
+        "m.sc": "postgraduate",
+        "mba": "postgraduate"
+    }
+
+    student_level = course_mapping.get(course)
+
+    if student_level is None:
+        return "unknown"
+
+    # Match the student's education level against the scheme
+    if student_level in scheme_level:
+        return "eligible"
+
+    if "higher education" in scheme_level:
+        return "potentially_eligible"
+
+    return "not_eligible"
 # 4. Combine all eligibility checks
+
+# 5. Combine all eligibility checks
 def check_basic_eligibility(student, scheme):
     """
-    Combines income, marks and category eligibility checks.
+    Combines income, marks, category and education-level checks.
     """
 
     income_result = check_income_eligibility(
@@ -125,16 +170,22 @@ def check_basic_eligibility(student, scheme):
         scheme.get("category")
     )
 
+    education_result = check_education_level_eligibility(
+        student.get("course"),
+        scheme.get("education_level")
+    )
+
     results = [
         income_result,
         marks_result,
-        category_result
+        category_result,
+        education_result
     ]
 
     if "not_eligible" in results:
         status = "not_eligible"
 
-    elif "unknown" in results:
+    elif "unknown" in results or "potentially_eligible" in results:
         status = "potentially_eligible"
 
     else:
@@ -145,10 +196,10 @@ def check_basic_eligibility(student, scheme):
         "checks": {
             "income": income_result,
             "marks": marks_result,
-            "category": category_result
+            "category": category_result,
+            "education_level": education_result
         }
     }
-
 
 # 5. Test the eligibility functions
 if __name__ == "__main__":
