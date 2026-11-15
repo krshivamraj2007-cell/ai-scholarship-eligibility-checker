@@ -102,7 +102,77 @@ def check_category_eligibility(student_category, scheme_category):
         return "eligible"
 
     return "not_eligible"
+# 4. Check gender eligibility
+# Check gender eligibility
+def check_gender_eligibility(student_gender, scheme_eligibility):
 
+    if not student_gender or not scheme_eligibility:
+        return "unknown"
+
+    student_gender = student_gender.strip().lower()
+    scheme_eligibility = scheme_eligibility.strip().lower()
+
+    # Girl students only
+    if "girl students" in scheme_eligibility or "female students" in scheme_eligibility:
+
+        if student_gender in ["female", "girl"]:
+            return "eligible"
+
+        if student_gender in ["male", "boy"]:
+            return "not_eligible"
+
+    # No clearly identified gender restriction
+    return "unknown"
+# 5. Check disability eligibility
+def check_disability_eligibility(student_disability, scheme_eligibility):
+    """
+    Checks whether the student satisfies the disability
+    requirement of a scheme.
+    """
+
+    if student_disability is None or not scheme_eligibility:
+        return "unknown"
+
+    scheme_eligibility = scheme_eligibility.strip().lower()
+
+    # Scheme requires students with disabilities
+    if "disabilit" in scheme_eligibility:
+        if student_disability is True:
+            return "eligible"
+
+        if student_disability is False:
+            return "not_eligible"
+
+        return "unknown"
+
+    # No clearly identifiable disability restriction
+    return "unknown"
+# Check institution eligibility
+def check_institution_eligibility(student_approval, scheme_institutions):
+
+    if not student_approval or not scheme_institutions:
+        return "unknown"
+
+    student_approval = student_approval.strip().lower()
+    scheme_institutions = scheme_institutions.strip().lower()
+
+    # AICTE-approved institution requirement
+    if "aicte-approved" in scheme_institutions or "aicte approved" in scheme_institutions:
+
+        if "aicte" in student_approval:
+            return "eligible"
+
+        return "not_eligible"
+
+    # QHEI or specifically designated institution requirements
+    # require separate institution verification.
+    if "quality higher educational institution" in scheme_institutions:
+        return "unknown"
+
+    if "designated" in scheme_institutions or "empanelled" in scheme_institutions:
+        return "unknown"
+
+    return "unknown"
 # 4. Check education-level eligibility
 def check_education_level_eligibility(student_course, scheme_education_level):
     """
@@ -169,19 +239,32 @@ def check_basic_eligibility(student, scheme):
         student.get("category"),
         scheme.get("category")
     )
-
-    education_result = check_education_level_eligibility(
-        student.get("course"),
-        scheme.get("education_level")
+    gender_result = check_gender_eligibility(
+    student.get("gender"),
+    scheme.get("eligibility_criteria")
     )
 
+    disability_result = check_disability_eligibility(
+    student.get("disability_status"),
+    scheme.get("eligibility_criteria")
+)
+    education_result = check_education_level_eligibility(
+    student.get("course"),
+    scheme.get("education_level")
+    )
+    institution_result = check_institution_eligibility(
+    student.get("institution_approval"),
+    scheme.get("eligible_institutions")
+    )   
     results = [
         income_result,
         marks_result,
         category_result,
-        education_result
+        gender_result,
+        disability_result,
+        education_result,
+        institution_result
     ]
-
     if "not_eligible" in results:
         status = "not_eligible"
 
@@ -197,7 +280,10 @@ def check_basic_eligibility(student, scheme):
             "income": income_result,
             "marks": marks_result,
             "category": category_result,
-            "education_level": education_result
+            "gender": gender_result,
+            "disability": disability_result,
+            "education_level": education_result,
+            "institution": institution_result
         }
     }
 

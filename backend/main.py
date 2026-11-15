@@ -189,7 +189,12 @@ def login_user(user: LoginRequest):
             status_code=500,
             detail="Something went wrong during login"
         )
+
+from datetime import date
+from typing import Optional
+
 class StudentProfileRequest(BaseModel):
+    # Existing fields
     state: str
     district: str
     category: str
@@ -198,6 +203,24 @@ class StudentProfileRequest(BaseModel):
     current_year: str
     previous_marks: float
     annual_family_income: float
+
+    # Additional eligibility fields
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    disability_status: Optional[bool] = None
+    disability_percentage: Optional[float] = None
+    domicile_state: Optional[str] = None
+    institution_name: Optional[str] = None
+    institution_type: Optional[str] = None
+    institution_approval: Optional[str] = None
+    admission_type: Optional[str] = None
+    admission_year: Optional[int] = None
+    education_level: Optional[str] = None
+    class_12_marks: Optional[float] = None
+    class_12_percentile: Optional[float] = None
+    entrance_exam: Optional[str] = None
+    entrance_exam_qualified: Optional[bool] = None
+    research_program: Optional[str] = None
 
 
 @app.post("/student-profile/{user_id}")
@@ -218,9 +241,29 @@ def save_student_profile(user_id: int, profile: StudentProfileRequest):
                         branch,
                         current_year,
                         previous_marks,
-                        annual_family_income
+                        annual_family_income,
+                        date_of_birth,
+                        gender,
+                        disability_status,
+                        disability_percentage,
+                        domicile_state,
+                        institution_name,
+                        institution_type,
+                        institution_approval,
+                        admission_type,
+                        admission_year,
+                        education_level,
+                        class_12_marks,
+                        class_12_percentile,
+                        entrance_exam,
+                        entrance_exam_qualified,
+                        research_program
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s
+                    )
                     ON CONFLICT (user_id)
                     DO UPDATE SET
                         state = EXCLUDED.state,
@@ -231,6 +274,22 @@ def save_student_profile(user_id: int, profile: StudentProfileRequest):
                         current_year = EXCLUDED.current_year,
                         previous_marks = EXCLUDED.previous_marks,
                         annual_family_income = EXCLUDED.annual_family_income,
+                        date_of_birth = EXCLUDED.date_of_birth,
+                        gender = EXCLUDED.gender,
+                        disability_status = EXCLUDED.disability_status,
+                        disability_percentage = EXCLUDED.disability_percentage,
+                        domicile_state = EXCLUDED.domicile_state,
+                        institution_name = EXCLUDED.institution_name,
+                        institution_type = EXCLUDED.institution_type,
+                        institution_approval = EXCLUDED.institution_approval,
+                        admission_type = EXCLUDED.admission_type,
+                        admission_year = EXCLUDED.admission_year,
+                        education_level = EXCLUDED.education_level,
+                        class_12_marks = EXCLUDED.class_12_marks,
+                        class_12_percentile = EXCLUDED.class_12_percentile,
+                        entrance_exam = EXCLUDED.entrance_exam,
+                        entrance_exam_qualified = EXCLUDED.entrance_exam_qualified,
+                        research_program = EXCLUDED.research_program,
                         updated_at = CURRENT_TIMESTAMP;
                     """,
                     (
@@ -242,13 +301,33 @@ def save_student_profile(user_id: int, profile: StudentProfileRequest):
                         profile.branch,
                         profile.current_year,
                         profile.previous_marks,
-                        profile.annual_family_income
+                        profile.annual_family_income,
+                        profile.date_of_birth,
+                        profile.gender,
+                        profile.disability_status,
+                        profile.disability_percentage,
+                        profile.domicile_state,
+                        profile.institution_name,
+                        profile.institution_type,
+                        profile.institution_approval,
+                        profile.admission_type,
+                        profile.admission_year,
+                        profile.education_level,
+                        profile.class_12_marks,
+                        profile.class_12_percentile,
+                        profile.entrance_exam,
+                        profile.entrance_exam_qualified,
+                        profile.research_program
                     )
                 )
 
-        return {"message": "Student profile saved successfully"}
+        return {
+            "message": "Student profile saved successfully",
+            "user_id": user_id
+        }
 
-    except Exception:
+    except Exception as error:
+        print("PROFILE SAVE ERROR:", repr(error))
         raise HTTPException(
             status_code=500,
             detail="Unable to save student profile"
@@ -338,7 +417,14 @@ def get_eligible_schemes(user_id: int):
                         branch,
                         current_year,
                         previous_marks,
-                        annual_family_income
+                        annual_family_income,
+                        gender,
+                        disability_status,
+                        disability_percentage,
+                        institution_name,
+                        institution_type,
+                        institution_approval,
+                        admission_type
                     FROM student_profiles
                     WHERE user_id = %s;
                     """,
