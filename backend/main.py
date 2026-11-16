@@ -400,13 +400,15 @@ def get_government_schemes():
         )
 
 @app.get("/eligible-schemes/{user_id}")
+
+@app.get("/eligible-schemes/{user_id}")
 def get_eligible_schemes(user_id: int):
 
     try:
         with get_db_connection() as connection:
             with connection.cursor() as cursor:
 
-                # 1. Fetch student profile
+                # 1. Fetch complete student profile
                 cursor.execute(
                     """
                     SELECT
@@ -421,10 +423,18 @@ def get_eligible_schemes(user_id: int):
                         gender,
                         disability_status,
                         disability_percentage,
+                        domicile_state,
                         institution_name,
                         institution_type,
                         institution_approval,
-                        admission_type
+                        admission_type,
+                        admission_year,
+                        education_level,
+                        class_12_marks,
+                        class_12_percentile,
+                        entrance_exam,
+                        entrance_exam_qualified,
+                        research_program
                     FROM student_profiles
                     WHERE user_id = %s;
                     """,
@@ -445,7 +455,7 @@ def get_eligible_schemes(user_id: int):
 
                 student = dict(zip(profile_columns, profile_row))
 
-                # 2. Fetch active schemes
+                # 2. Fetch all active government schemes
                 cursor.execute(
                     """
                     SELECT *
@@ -456,6 +466,7 @@ def get_eligible_schemes(user_id: int):
                 )
 
                 scheme_rows = cursor.fetchall()
+
                 scheme_columns = [
                     column.name for column in cursor.description
                 ]
@@ -465,23 +476,57 @@ def get_eligible_schemes(user_id: int):
                     for row in scheme_rows
                 ]
 
-        # 3. Match student with schemes
+        # 3. Match student profile against every scheme
         matched_schemes = []
 
         for scheme in schemes:
 
-            eligibility_result = check_basic_eligibility(student, scheme)
+            eligibility_result = check_basic_eligibility(
+                student,
+                scheme
+            )
 
             matched_schemes.append({
                 "scheme_id": scheme["id"],
                 "scheme_name": scheme["scheme_name"],
+                "government_level": scheme["government_level"],
+                "state_ut": scheme["state_ut"],
+                "scheme_type": scheme["scheme_type"],
+                "benefit_type": scheme["benefit_type"],
+
                 "status": eligibility_result["status"],
+
                 "checks": eligibility_result["checks"]
             })
 
+        # 4. Calculate matching summary
+        eligible_count = sum(
+            1 for scheme in matched_schemes
+            if scheme["status"] == "eligible"
+        )
+
+        potentially_eligible_count = sum(
+            1 for scheme in matched_schemes
+            if scheme["status"] == "potentially_eligible"
+        )
+
+        not_eligible_count = sum(
+            1 for scheme in matched_schemes
+            if scheme["status"] == "not_eligible"
+        )
+
+        # 5. Return eligibility results
         return {
             "user_id": user_id,
+
             "total_schemes": len(schemes),
+
+            "summary": {
+                "eligible": eligible_count,
+                "potentially_eligible": potentially_eligible_count,
+                "not_eligible": not_eligible_count
+            },
+
             "matched_schemes": matched_schemes
         }
 
@@ -489,7 +534,11 @@ def get_eligible_schemes(user_id: int):
         raise
 
     except Exception as error:
-        print("ELIGIBILITY MATCHING ERROR:", repr(error))
+
+        print(
+            "ELIGIBILITY MATCHING ERROR:",
+            repr(error)
+        )
 
         raise HTTPException(
             status_code=500,
