@@ -31,6 +31,47 @@ def normalize_category(value):
     return None
 
 
+def get_rule_status(eligibility_rules, rule_name):
+    """
+    Read the applicability of a rule from the scheme's JSONB data.
+    """
+
+    if not isinstance(eligibility_rules, dict):
+        return "unknown"
+
+    rule = eligibility_rules.get(rule_name)
+
+    if not isinstance(rule, dict):
+        return "unknown"
+
+    applies = rule.get("applies")
+
+    if applies is True:
+        return "required"
+
+    if applies is False:
+        return "not_applicable"
+
+    return "unknown"
+
+def evaluate_rule_applicability(eligibility_rules, rule_name):
+    """
+    Determine whether an eligibility check should run.
+    """
+
+    rule_status = get_rule_status(
+        eligibility_rules,
+        rule_name
+    )
+
+    if rule_status == "required":
+        return True
+
+    if rule_status == "not_applicable":
+        return False
+
+    return None
+
 # ============================================================
 # 2. INCOME ELIGIBILITY
 # ============================================================
@@ -46,37 +87,94 @@ def check_income_eligibility(student_income, scheme_income_limit):
     return "not_eligible"
 
 
+def evaluate_income_rule(student_income, income_rule):
+    """
+    Evaluate income eligibility using a JSONB income rule.
+    """
+
+    if not isinstance(income_rule, dict):
+        return "unknown"
+
+    applies = income_rule.get("applies")
+
+    if applies is False:
+        return "not_applicable"
+
+    if applies is not True:
+        return "unknown"
+
+    if student_income is None:
+        return "unknown"
+
+    income_limit = income_rule.get(
+        "maximum_annual_family_income"
+    )
+
+    if income_limit is None:
+        return "unknown"
+
+    comparison = income_rule.get("comparison", "less_than_or_equal")
+
+    if comparison == "less_than":
+        return (
+            "eligible"
+            if student_income < income_limit
+            else "not_eligible"
+        )
+
+    if comparison == "less_than_or_equal":
+        return (
+            "eligible"
+            if student_income <= income_limit
+            else "not_eligible"
+        )
+
+    return "unknown"
+
 # ============================================================
 # 3. EDUCATION LOAN ELIGIBILITY
 # ============================================================
 
-def check_loan_income_eligibility(student_income, scheme_name):
+def check_loan_income_eligibility(student_income, eligibility_rules):
 
-    scheme_name = normalize(scheme_name)
+    loan_rule = eligibility_rules.get("loan", {})
 
-    if "pm-vidyalaxmi" in scheme_name:
-        # Loan availability is not restricted by family income.
+    if not isinstance(loan_rule, dict):
+        return "unknown"
+
+    if loan_rule.get("applies") is False:
+        return "not_applicable"
+
+    if loan_rule.get("applies") is True:
         return "eligible"
 
     return "unknown"
-
-
 # ============================================================
 # 4. INTEREST SUBVENTION ELIGIBILITY
 # ============================================================
 
 def check_interest_subvention_eligibility(
     student_income,
-    scheme_name,
-    income_limit
+    eligibility_rules
 ):
+    subvention_rule = eligibility_rules.get(
+        "interest_subvention", {}
+    )
 
-    scheme_name = normalize(scheme_name)
+    if not isinstance(subvention_rule, dict):
+        return "unknown"
 
-    if "pm-vidyalaxmi" not in scheme_name:
+    if subvention_rule.get("applies") is False:
         return "not_applicable"
 
-    if student_income is None or income_limit is None:
+    if subvention_rule.get("applies") is not True:
+        return "unknown"
+
+    income_limit = subvention_rule.get(
+        "maximum_annual_family_income"
+    )
+
+    if income_limit is None or student_income is None:
         return "unknown"
 
     if student_income <= income_limit:
@@ -84,7 +182,34 @@ def check_interest_subvention_eligibility(
 
     return "not_eligible"
 
+def check_full_interest_subsidy(
+    student_income,
+    eligibility_rules
+):
+    subsidy_rule = eligibility_rules.get(
+        "full_interest_subsidy", {}
+    )
 
+    if not isinstance(subsidy_rule, dict):
+        return "unknown"
+
+    if subsidy_rule.get("applies") is False:
+        return "not_applicable"
+
+    if subsidy_rule.get("applies") is not True:
+        return "unknown"
+
+    income_limit = subsidy_rule.get(
+        "maximum_annual_family_income"
+    )
+
+    if income_limit is None or student_income is None:
+        return "unknown"
+
+    if student_income <= income_limit:
+        return "eligible"
+
+    return "not_eligible"
 # ============================================================
 # 5. MARKS ELIGIBILITY
 # ============================================================
@@ -619,32 +744,29 @@ def check_basic_eligibility(student, scheme):
     scheme_name = normalize(scheme.get("scheme_name"))
 
     # Income check
-    if "pm-vidyalaxmi" in scheme_name:
+    # Income check using JSONB eligibility rules
+    eligibility_rules = scheme.get("eligibility_rules") or {}
 
-        income_result = check_loan_income_eligibility(
-            student.get("annual_family_income"),
-            scheme.get("scheme_name")
-        )
+    income_rule = eligibility_rules.get("income", {})
 
-    else:
-
-        income_result = check_income_eligibility(
-            student.get("annual_family_income"),
-            scheme.get("annual_income_limit")
-        )
-
+    income_result = evaluate_income_rule(
+        student.get("annual_family_income"),
+        income_rule
+    )
     # Separate loan and interest subsidy checks
     loan_income_result = check_loan_income_eligibility(
         student.get("annual_family_income"),
-        scheme.get("scheme_name")
+        eligibility_rules
     )
 
     interest_subvention_result = check_interest_subvention_eligibility(
         student.get("annual_family_income"),
-        scheme.get("scheme_name"),
-        scheme.get("annual_income_limit")
+        eligibility_rules
     )
-
+    full_interest_subsidy_result = check_full_interest_subsidy(
+        student.get("annual_family_income"),
+        eligibility_rules
+    )
     # Academic marks
     marks_result = check_marks_eligibility(
         student.get("previous_marks"),
@@ -755,6 +877,7 @@ def check_basic_eligibility(student, scheme):
             "admission_type": admission_result,
             "loan_income": loan_income_result,
             "interest_subvention": interest_subvention_result,
+            "full_interest_subsidy": full_interest_subsidy_result,
             "course": course_result,
             "state": state_result,
             "entrance_exam": entrance_exam_result
