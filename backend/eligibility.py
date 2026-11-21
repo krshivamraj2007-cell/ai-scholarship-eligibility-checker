@@ -145,10 +145,12 @@ def check_loan_income_eligibility(student_income, eligibility_rules):
     if loan_rule.get("applies") is False:
         return "not_applicable"
 
-    if loan_rule.get("applies") is True:
-        return "eligible"
+    if loan_rule.get("applies") is not True:
+        return "unknown"
 
-    return "unknown"
+    # Loan is required, but actual loan conditions
+    # have not yet been verified.
+    return "potentially_eligible"
 # ============================================================
 # 4. INTEREST SUBVENTION ELIGIBILITY
 # ============================================================
@@ -170,25 +172,59 @@ def check_interest_subvention_eligibility(
     if subvention_rule.get("applies") is not True:
         return "unknown"
 
+    income_rule = eligibility_rules.get("income", {})
+
     income_limit = subvention_rule.get(
         "maximum_annual_family_income"
     )
 
-    if income_limit is None or student_income is None:
+    if income_limit is None and isinstance(income_rule, dict):
+        income_limit = income_rule.get(
+            "maximum_annual_family_income"
+        )
+
+    if student_income is None or income_limit is None:
         return "unknown"
 
-    if student_income <= income_limit:
-        return "eligible"
+    comparison = income_rule.get(
+        "comparison", "less_than_or_equal"
+    )
 
-    return "not_eligible"
+    if comparison == "less_than":
+        return (
+            "eligible"
+            if student_income < income_limit
+            else "not_eligible"
+        )
+
+    if comparison == "less_than_or_equal":
+        return (
+            "eligible"
+            if student_income <= income_limit
+            else "not_eligible"
+        )
+
+    return "unknown"
 
 def check_full_interest_subsidy(
     student_income,
     eligibility_rules
 ):
     subsidy_rule = eligibility_rules.get(
-        "full_interest_subsidy", {}
+        "full_interest_subsidy"
     )
+
+    # CSIS stores its 100% subsidy under interest_subvention.
+    if subsidy_rule is None:
+        subvention_rule = eligibility_rules.get(
+            "interest_subvention", {}
+        )
+
+        if (
+            isinstance(subvention_rule, dict)
+            and subvention_rule.get("rate_percent") == 100
+        ):
+            subsidy_rule = subvention_rule
 
     if not isinstance(subsidy_rule, dict):
         return "unknown"
@@ -199,17 +235,39 @@ def check_full_interest_subsidy(
     if subsidy_rule.get("applies") is not True:
         return "unknown"
 
+    income_rule = eligibility_rules.get("income", {})
+
     income_limit = subsidy_rule.get(
         "maximum_annual_family_income"
     )
 
-    if income_limit is None or student_income is None:
+    if income_limit is None and isinstance(income_rule, dict):
+        income_limit = income_rule.get(
+            "maximum_annual_family_income"
+        )
+
+    if student_income is None or income_limit is None:
         return "unknown"
 
-    if student_income <= income_limit:
-        return "eligible"
+    comparison = income_rule.get(
+        "comparison", "less_than_or_equal"
+    )
 
-    return "not_eligible"
+    if comparison == "less_than":
+        return (
+            "eligible"
+            if student_income < income_limit
+            else "not_eligible"
+        )
+
+    if comparison == "less_than_or_equal":
+        return (
+            "eligible"
+            if student_income <= income_limit
+            else "not_eligible"
+        )
+
+    return "unknown"
 # ============================================================
 # 5. MARKS ELIGIBILITY
 # ============================================================
@@ -489,113 +547,108 @@ def get_student_education_level(course):
 
 
 def check_education_level_eligibility(
-    student_course,
-    scheme_education_level
+    student_education_level,
+    scheme_education_rule,
+    student_course=None
 ):
 
-    if not student_course or not scheme_education_level:
+    if not isinstance(scheme_education_rule, dict):
         return "unknown"
 
-    student_level = get_student_education_level(student_course)
+    applies = scheme_education_rule.get("applies")
 
-    if student_level is None:
+    if applies is False:
+        return "not_applicable"
+
+    if applies is not True:
         return "unknown"
 
-    scheme_level = normalize(scheme_education_level)
+    # Use the education level directly from the student profile.
+    if student_education_level:
+        student_level = normalize(student_education_level)
+    else:
+        student_level = get_student_education_level(student_course)
 
-    if student_level in scheme_level:
+    if not student_level:
+        return "unknown"
+
+    allowed_levels = scheme_education_rule.get("allowed", [])
+
+    if not isinstance(allowed_levels, list):
+        return "unknown"
+
+    allowed_levels = [
+        normalize(level) for level in allowed_levels
+    ]
+
+    if student_level in allowed_levels:
         return "eligible"
 
-    if "higher education" in scheme_level:
+    if "higher education" in allowed_levels:
         return "potentially_eligible"
 
     return "not_eligible"
-
 
 # ============================================================
 # 12. COURSE ELIGIBILITY
 # ============================================================
 
-def check_course_eligibility(student_course, scheme_courses):
+def check_course_eligibility(
+    student_course,
+    course_rule
+):
 
-    if not student_course or not scheme_courses:
+    if not isinstance(course_rule, dict):
+        return "unknown"
+
+    applies = course_rule.get("applies")
+
+    if applies is False:
+        return "not_applicable"
+
+    if applies is not True:
+        return "unknown"
+
+    if not student_course:
         return "unknown"
 
     course = normalize(student_course)
-    scheme = normalize(scheme_courses)
 
-    course_mapping = {
-        "b.tech": [
-            "b.tech",
-            "bachelor of technology",
-            "technical degree"
-        ],
+    allowed = course_rule.get("allowed", [])
+    excluded = course_rule.get("excluded", [])
 
-        "b.e.": [
-            "b.e.",
-            "bachelor of engineering",
-            "technical degree"
-        ],
+    if course in [normalize(item) for item in excluded]:
+        return "not_eligible"
 
-        "bca": [
-            "bca",
-            "bachelor of computer applications"
-        ],
-
-        "b.sc": [
-            "b.sc",
-            "bachelor of science"
-        ],
-
-        "b.com": [
-            "b.com",
-            "bachelor of commerce"
-        ],
-
-        "diploma": [
-            "diploma",
-            "technical diploma"
-        ],
-
-        "m.tech": [
-            "m.tech",
-            "master of technology",
-            "technical postgraduate degree"
-        ],
-
-        "mca": [
-            "mca",
-            "master of computer applications"
+    if allowed:
+        normalized_allowed = [
+            normalize(item) for item in allowed
         ]
-    }
 
-    student_variations = course_mapping.get(course, [course])
-
-    # Direct course matching.
-    for variation in student_variations:
-
-        if variation in scheme:
+        if course in normalized_allowed:
             return "eligible"
 
-    # General degree courses.
-    student_level = get_student_education_level(course)
+        return "unknown"
 
-    if (
-        student_level == "undergraduate"
-        and "degree courses" in scheme
-    ):
-        return "eligible"
+    requirement = normalize(
+        course_rule.get("requirement", "")
+    )
 
-    # Technical courses may require verification against
-    # the scheme's official eligible-course list.
-    if (
-        "professional and technical courses" in scheme
-        and student_level in ["undergraduate", "postgraduate"]
-    ):
+    if "technical" in requirement and course in [
+        "b.tech",
+        "b.e.",
+        "bachelor of technology",
+        "bachelor of engineering"
+    ]:
         return "potentially_eligible"
 
-    return "unknown"
+    if "degree courses" in requirement:
+        level = get_student_education_level(course)
 
+        if level in ["undergraduate", "postgraduate"]:
+            return "potentially_eligible"
+
+    return "unknown"
 
 # ============================================================
 # 13. STATE / DOMICILE ELIGIBILITY
@@ -794,14 +847,15 @@ def check_basic_eligibility(student, scheme):
 
     # Education level
     education_result = check_education_level_eligibility(
-        student.get("course"),
-        scheme.get("education_level")
+        student.get("education_level"),
+        eligibility_rules.get("education_level", {}),
+        student.get("course")
     )
 
     # Course
     course_result = check_course_eligibility(
         student.get("course"),
-        scheme.get("eligible_courses")
+        eligibility_rules.get("course", {})
     )
 
     # Institution
