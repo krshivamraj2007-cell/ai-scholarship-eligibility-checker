@@ -1,0 +1,144 @@
+
+.ai-chat-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f4f7fb;
+  padding: 25px;
+  font-family: Arial, sans-serif;
+}
+
+.ai-chat-header {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.ai-chat-header h2 {
+  color: #263b80;
+  margin: 12px 0 5px;
+}
+
+.ai-chat-header p {
+  color: #666;
+}
+
+.ai-chat-header button {
+  padding: 9px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #263b80;
+  color: white;
+  cursor: pointer;
+}
+
+.ai-chat-messages {
+  flex: 1;
+  margin: 20px 0;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  overflow-y: auto;
+  min-height: 350px;
+}
+
+.chat-message {
+  max-width: 75%;
+  padding: 12px 16px;
+  margin: 12px 0;
+  border-radius: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.chat-message.user {
+  margin-left: auto;
+  background: #263b80;
+  color: white;
+}
+
+.chat-message.assistant {
+  margin-right: auto;
+  background: #e9eef8;
+  color: #222;
+}
+
+.chat-message p {
+  margin-bottom: 0;
+}
+
+.ai-chat-input {
+  display: flex;
+  gap: 12px;
+}
+
+.ai-chat-input input {
+  flex: 1;
+  padding: 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+.ai-chat-input button {
+  padding: 12px 25px;
+  background: #263b80;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.ai-chat-input button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.recommendation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.recommendation-card {
+  background: white;
+  border: 1px solid #dce3ef;
+  border-radius: 12px;
+  padding: 16px;
+  color: #222;
+}
+
+.recommendation-card h3 {
+  color: #263b80;
+  margin-bottom: 10px;
+}
+
+.eligibility-status {
+  display: inline-block;
+  background: #fff3cd;
+  color: #856404;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  text-transform: capitalize;
+  margin-bottom: 12px;
+}
+
+.recommendation-card p {
+  margin: 10px 0;
+  line-height: 1.5;
+}
+
+.recommendation-card a {
+  display: inline-block;
+  color: #263b80;
+  font-weight: bold;
+  text-decoration: none;
+  margin-top: 8px;
+}
+
+.recommendation-card a:hover {
+  text-decoration: underline;
+}

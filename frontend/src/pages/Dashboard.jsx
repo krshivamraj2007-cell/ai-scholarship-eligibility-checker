@@ -1,3 +1,4 @@
+import AIChat from "../components/AIChat";
 import GovernmentSchemes from "./GovernmentSchemes";
 import StudentProfile from "./StudentProfile";
 import React, { useState } from "react";
@@ -6,6 +7,7 @@ import "./Dashboard.css";
 function Dashboard({ user, onLogout }) {
   const [showProfile, setShowProfile] = useState(false);
   const [showSchemes, setShowSchemes] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
   if (showProfile) {
   return (
     <StudentProfile
@@ -18,6 +20,14 @@ function Dashboard({ user, onLogout }) {
   return (
     <GovernmentSchemes
       onBack={() => setShowSchemes(false)}
+    />
+  );
+}
+  if (showAIChat) {
+  return (
+    <AIChat
+      userId={user?.id}
+      onBack={() => setShowAIChat(false)}
     />
   );
 }
@@ -66,7 +76,11 @@ function Dashboard({ user, onLogout }) {
             <p>Manage your student information.</p>
           </div>
 
-          <div className="dashboard-card">
+          <div
+            className="dashboard-card"
+            onClick={() => setShowAIChat(true)}
+            style={{ cursor: "pointer" }}
+          >
             <h2>🤖</h2>
             <h3>AI Assistant</h3>
             <p>Get scholarship eligibility guidance.</p>

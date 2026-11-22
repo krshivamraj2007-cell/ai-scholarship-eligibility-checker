@@ -1,3 +1,4 @@
+from ai_service import ask_ai
 from eligibility import check_basic_eligibility
 from datetime import datetime, timedelta, timezone
 from jose import jwt
@@ -490,6 +491,8 @@ def get_eligible_schemes(user_id: int):
                 "scheme_id": scheme["id"],
                 "scheme_name": scheme["scheme_name"],
                 "government_level": scheme["government_level"],
+                "official_source_url": scheme["official_source_url"],
+                "benefits": scheme["benefits"],
                 "state_ut": scheme["state_ut"],
                 "scheme_type": scheme["scheme_type"],
                 "benefit_type": scheme["benefit_type"],
@@ -544,3 +547,150 @@ def get_eligible_schemes(user_id: int):
             status_code=500,
             detail="Unable to match government schemes"
         )
+
+
+
+
+@app.post("/ai-chat")
+def ai_chat(data: dict):
+
+    message = data.get("message", "").strip()
+    user_id = data.get("user_id")
+
+    if not message:
+        return {"error": "Message cannot be empty"}
+
+    if not user_id:
+        return {"error": "Student ID is required"}
+
+    try:
+        # 1. Get student's eligibility results
+        eligibility_data = get_eligible_schemes(int(user_id))
+
+        print("ELIGIBILITY SUMMARY:", eligibility_data["summary"])
+
+        # 2. Select eligible and potentially eligible schemes
+        eligible_matches = [
+            scheme
+            for scheme in eligibility_data["matched_schemes"]
+            if scheme["status"] in [
+                "eligible",
+                "potentially_eligible"
+            ]
+        ]
+
+        # 3. Build eligibility context
+        eligibility_context = ""
+
+        for scheme in eligible_matches:
+            eligibility_context += f"""
+Scheme: {scheme['scheme_name']}
+Eligibility Status: {scheme['status']}
+Benefits: {scheme['benefits']}
+Official Source: {scheme['official_source_url']}
+Eligibility Checks: {scheme['checks']}
+"""
+
+        if not eligible_matches:
+            eligibility_context = (
+                "No eligible or potentially eligible schemes "
+                "were found by the eligibility evaluator."
+            )
+
+        # 4. Fetch government scheme information
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                scheme_name,
+                description,
+                eligibility_criteria,
+                benefits,
+                required_documents,
+                official_source_url
+            FROM government_schemes
+            WHERE is_active = TRUE
+            ORDER BY id
+        """)
+
+        schemes = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        # 5. Build database context
+        scheme_context = ""
+
+        for scheme in schemes:
+            scheme_context += f"""
+Scheme: {scheme[0]}
+Description: {scheme[1]}
+Eligibility Criteria: {scheme[2]}
+Benefits: {scheme[3]}
+Required Documents: {scheme[4]}
+Official Source: {scheme[5]}
+"""
+
+        # 6. Build AI prompt
+        prompt = f"""
+You are ScholarAI, an AI assistant for Indian scholarships
+and government education schemes.
+
+IMPORTANT RULES:
+
+1. Use only the supplied database information.
+2. Use eligibility evaluator results for personalized recommendations.
+3. Never invent scheme names, benefits, amounts or URLs.
+4. Use only official source URLs supplied in the database.
+5. Clearly distinguish eligible and potentially eligible schemes.
+6. Never describe potentially eligible as confirmed eligible.
+7. Explain unknown eligibility checks honestly.
+8. Do not recommend schemes marked not eligible.
+9. Use simple English.
+
+DATABASE INFORMATION:
+{scheme_context}
+
+STUDENT ELIGIBILITY RESULTS:
+Recommend only schemes listed here.
+Never change their eligibility status.
+
+{eligibility_context}
+
+STUDENT QUESTION:
+{message}
+
+Provide a short conversational introduction only.
+Do not list individual scheme names.
+Do not repeat scheme benefits or eligibility statuses.
+The frontend will display recommendations separately.
+
+Tell the student that matching schemes are displayed below.
+"""
+
+        # 7. Generate AI response
+        response = ask_ai(prompt)
+
+        return {
+            "message": message,
+            "response": response,
+            "recommendations": [
+                {
+                    "scheme_name": scheme["scheme_name"],
+                    "status": scheme["status"],
+                    "benefits": scheme["benefits"],
+                    "official_source_url": scheme["official_source_url"],
+                    "checks": scheme["checks"]
+                }
+                for scheme in eligible_matches
+            ]
+        }
+
+    except Exception as error:
+
+        print("AI Chat Error:", repr(error))
+
+        return {
+            "error": "Unable to process your question right now."
+        }
